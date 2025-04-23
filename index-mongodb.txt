@@ -1,0 +1,267 @@
+without index
+db.orders.find({ customer_id: 1 }).explain("executionStats");
+
+
+
+
+create index 
+// Single-field index on customer_id
+db.orders.createIndex({ customer_id: 1 });
+
+// Compound index on customer_id and status
+db.orders.createIndex({ customer_id: 1, status: 1 });
+
+
+with index
+db.orders.find({ customer_id: 1 }).explain("executionStats");
+
+
+to see all:
+show dbs
+
+to switch between dbs:
+use ordersDB
+
+drop index:
+db.orders.dropIndex({ customer_id: 1 });
+
+to see indexes: db.orders.getIndexes()
+
+
+LOG SUMMARY FROM AI:
+🔍 Before Indexing
+Stage: COLLSCAN → full collection scan
+
+Execution Time: 0 ms (very small data set)
+
+Documents Examined: 4
+
+Keys Examined: 0
+
+nReturned: 3
+
+MongoDB had to scan all documents, even if the data set was small.
+
+
+
+✅ After Indexing
+Stage: IXSCAN → uses index customer_id_1
+
+Execution Time: 22 ms (could be startup delay or explain overhead)
+
+Documents Examined: 3
+
+Keys Examined: 3
+
+nReturned: 3
+
+Now the query uses an index scan and fetch, only looking at the relevant records.
+
+
+🔄 Rejected Plan
+MongoDB also considered the compound index customer_id_1_status_1, but rejected it for this simple query (because status wasn't used in the filter). That’s expected behavior.
+
+
+
+
+LOGS:
+can you see any difference
+
+ordersDB> db.orders.find({ customer_id: 1 }).explain("executionStats");
+{
+  explainVersion: '1',
+  queryPlanner: {
+    namespace: 'ordersDB.orders',
+    parsedQuery: { customer_id: { '$eq': 1 } },
+    indexFilterSet: false,
+    queryHash: '84A9FE9F',
+    planCacheShapeHash: '84A9FE9F',
+    planCacheKey: '7BD59CF3',
+    optimizationTimeMillis: 0,
+    maxIndexedOrSolutionsReached: false,
+    maxIndexedAndSolutionsReached: false,
+    maxScansToExplodeReached: false,
+    prunedSimilarIndexes: false,
+    winningPlan: {
+      isCached: false,
+      stage: 'COLLSCAN',
+      filter: { customer_id: { '$eq': 1 } },
+      direction: 'forward'
+    },
+    rejectedPlans: []
+  },
+  executionStats: {
+    executionSuccess: true,
+    nReturned: 3,
+    executionTimeMillis: 0,
+    totalKeysExamined: 0,
+    totalDocsExamined: 4,
+    executionStages: {
+      isCached: false,
+      stage: 'COLLSCAN',
+      filter: { customer_id: { '$eq': 1 } },
+      nReturned: 3,
+      executionTimeMillisEstimate: 0,
+      works: 5,
+      advanced: 3,
+      needTime: 1,
+      needYield: 0,
+      saveState: 0,
+      restoreState: 0,
+      isEOF: 1,
+      direction: 'forward',
+      docsExamined: 4
+    }
+  },
+  queryShapeHash: 'C59F423B03170A7C14E31953F7B2AA27D41977AF8C1B2526CFBBBF92D7360ED6',
+  command: { find: 'orders', filter: { customer_id: 1 }, '$db': 'ordersDB' },
+  serverInfo: {
+    host: 'DESKTOP-EQCNM9P',
+    port: 27017,
+    version: '8.0.8',
+    gitVersion: '7f52660c14217ed2c8d3240f823a2291a4fe6abd'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  ok: 1
+}
+ordersDB> // Single-field index on customer_id
+... db.orders.createIndex({ customer_id: 1 });
+...
+... // Compound index on customer_id and status
+... db.orders.createIndex({ customer_id: 1, status: 1 });
+...
+customer_id_1_status_1
+ordersDB> db.orders.find({ customer_id: 1 }).explain("executionStats");
+{
+  explainVersion: '1',
+  queryPlanner: {
+    namespace: 'ordersDB.orders',
+    parsedQuery: { customer_id: { '$eq': 1 } },
+    indexFilterSet: false,
+    queryHash: '84A9FE9F',
+    planCacheShapeHash: '84A9FE9F',
+    planCacheKey: '0CBD34AB',
+    optimizationTimeMillis: 22,
+    maxIndexedOrSolutionsReached: false,
+    maxIndexedAndSolutionsReached: false,
+    maxScansToExplodeReached: false,
+    prunedSimilarIndexes: false,
+    winningPlan: {
+      isCached: false,
+      stage: 'FETCH',
+      inputStage: {
+        stage: 'IXSCAN',
+        keyPattern: { customer_id: 1 },
+        indexName: 'customer_id_1',
+        isMultiKey: false,
+        multiKeyPaths: { customer_id: [] },
+        isUnique: false,
+        isSparse: false,
+        isPartial: false,
+        indexVersion: 2,
+        direction: 'forward',
+        indexBounds: { customer_id: [ '[1, 1]' ] }
+      }
+    },
+    rejectedPlans: [
+      {
+        isCached: false,
+        stage: 'FETCH',
+        inputStage: {
+          stage: 'IXSCAN',
+          keyPattern: { customer_id: 1, status: 1 },
+          indexName: 'customer_id_1_status_1',
+          isMultiKey: false,
+          multiKeyPaths: { customer_id: [], status: [] },
+          isUnique: false,
+          isSparse: false,
+          isPartial: false,
+          indexVersion: 2,
+          direction: 'forward',
+          indexBounds: { customer_id: [ '[1, 1]' ], status: [ '[MinKey, MaxKey]' ] }
+        }
+      }
+    ]
+  },
+  executionStats: {
+    executionSuccess: true,
+    nReturned: 3,
+    executionTimeMillis: 22,
+    totalKeysExamined: 3,
+    totalDocsExamined: 3,
+    executionStages: {
+      isCached: false,
+      stage: 'FETCH',
+      nReturned: 3,
+      executionTimeMillisEstimate: 12,
+      works: 5,
+      advanced: 3,
+      needTime: 0,
+      needYield: 0,
+      saveState: 1,
+      restoreState: 1,
+      isEOF: 1,
+      docsExamined: 3,
+      alreadyHasObj: 0,
+      inputStage: {
+        stage: 'IXSCAN',
+        nReturned: 3,
+        executionTimeMillisEstimate: 12,
+        works: 4,
+        advanced: 3,
+        needTime: 0,
+        needYield: 0,
+        saveState: 1,
+        restoreState: 1,
+        isEOF: 1,
+        keyPattern: { customer_id: 1 },
+        indexName: 'customer_id_1',
+        isMultiKey: false,
+        multiKeyPaths: { customer_id: [] },
+        isUnique: false,
+        isSparse: false,
+        isPartial: false,
+        indexVersion: 2,
+        direction: 'forward',
+        indexBounds: { customer_id: [ '[1, 1]' ] },
+        keysExamined: 3,
+        seeks: 1,
+        dupsTested: 0,
+        dupsDropped: 0
+      }
+    }
+  },
+  queryShapeHash: 'C59F423B03170A7C14E31953F7B2AA27D41977AF8C1B2526CFBBBF92D7360ED6',
+  command: { find: 'orders', filter: { customer_id: 1 }, '$db': 'ordersDB' },
+  serverInfo: {
+    host: 'DESKTOP-EQCNM9P',
+    port: 27017,
+    version: '8.0.8',
+    gitVersion: '7f52660c14217ed2c8d3240f823a2291a4fe6abd'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  ok: 1
+}
+ordersDB>
