@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Management</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    form { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    form div { margin-bottom: 10px; }
+    label { display: inline-block; width: 100px; }
+    input, select { padding: 5px; width: 200px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f4f4f4; }
+    button { padding: 5px 10px; margin: 0 2px; }
+    .hidden { display: none; }
+    #log-output { margin-top: 20px; padding: 10px; border: 1px solid #333; background: #f9f9f9; height: 150px; overflow-y: scroll; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>Order Management</h1>
+
+  <!-- Create / Update Form -->
+  <form id="order-form">
+    <h2 id="form-title">Create New Order</h2>
+    <input type="hidden" id="order-id" />
+    <div>
+      <label for="order_id">Order ID:</label>
+      <input type="number" id="order_id" required />
+    </div>
+    <div>
+      <label for="customer_id">Customer ID:</label>
+      <input type="number" id="customer_id" required />
+    </div>
+    <div>
+      <label for="order_date">Order Date:</label>
+      <input type="date" id="order_date" required />
+    </div>
+    <div>
+      <label for="amount">Amount:</label>
+      <input type="number" id="amount" step="0.01" required />
+    </div>
+    <div>
+      <label for="status">Status:</label>
+      <select id="status" required>
+        <option value="pending">pending</option>
+        <option value="shipped">shipped</option>
+        <option value="delivered">delivered</option>
+        <option value="cancelled">cancelled</option>
+      </select>
+    </div>
+    <button type="submit" id="submit-btn">Save Order</button>
+    <button type="button" id="cancel-btn" class="hidden">Cancel</button>
+  </form>
+
+  <!-- Search Form -->
+  <form id="search-form">
+    <h2>Search Orders</h2>
+    <div>
+      <label for="search_customer">Customer ID:</label>
+      <input type="number" id="search_customer" />
+    </div>
+    <div>
+      <label for="search_status">Status:</label>
+      <select id="search_status">
+        <option value="">-- Any --</option>
+        <option value="pending">pending</option>
+        <option value="shipped">shipped</option>
+        <option value="delivered">delivered</option>
+        <option value="cancelled">cancelled</option>
+      </select>
+    </div>
+    <button type="submit">Search</button>
+    <button type="button" id="reset-btn">Reset</button>
+  </form>
+
+  <!-- Orders Table -->
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Order ID</th><th>Customer ID</th><th>Date</th><th>Amount</th><th>Status</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="orders-body">
+      <!-- rows inserted here -->
+    </tbody>
+  </table>
+
+  <!-- Log Output -->
+  <div id="log-output"></div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000/api';
+    const logOutput = document.getElementById('log-output');
+
+    function log(message) {
+      const time = new Date().toLocaleTimeString();
+      logOutput.innerHTML += `[${time}] ${message}<br>`;
+      logOutput.scrollTop = logOutput.scrollHeight;
+      console.log(message);
+    }
+
+    window.addEventListener('error', e => {
+      log(`Error: ${e.message} at ${e.filename}:${e.lineno}`);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      log('Page loaded. Fetching orders...');
+      fetchAllOrders();
+      setupForm();
+      setupSearch();
+    });
+
+    function setupForm() {
+      const form = document.getElementById('order-form');
+      const cancelBtn = document.getElementById('cancel-btn');
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        const id = document.getElementById('order-id').value;
+        const data = getFormData();
+        log(id ? `Updating order ${id}` : 'Creating new order');
+        if (id) updateOrder(id, data);
+        else createOrder(data);
+      });
+      cancelBtn.addEventListener('click', () => {
+        log('Order update cancelled');
+        resetForm();
+      });
+    }
+
+    function setupSearch() {
+      const searchForm = document.getElementById('search-form');
+      const resetBtn = document.getElementById('reset-btn');
+      searchForm.addEventListener('submit', e => {
+        e.preventDefault();
+        log('Searching orders');
+        searchOrders();
+      });
+      resetBtn.addEventListener('click', () => {
+        document.getElementById('search_customer').value = '';
+        document.getElementById('search_status').value = '';
+        log('Search reset');
+        fetchAllOrders();
+      });
+    }
+
+    function getFormData() {
+      const data = {
+        order_id: Number(document.getElementById('order_id').value),
+        customer_id: Number(document.getElementById('customer_id').value),
+        order_date: document.getElementById('order_date').value,
+        amount: Number(document.getElementById('amount').value),
+        status: document.getElementById('status').value
+      };
+      log(`Form data: ${JSON.stringify(data)}`);
+      return data;
+    }
+
+    async function fetchAllOrders() {
+      try {
+        const res = await fetch(`${API_BASE}/orders`);
+        const orders = await res.json();
+        log(`Fetched ${orders.length} orders`);
+        populateTable(orders);
+      } catch (error) {
+        log(`Fetch all orders failed: ${error.message}`);
+      }
+    }
+
+    async function createOrder(data) {
+      try {
+        const res = await fetch(`${API_BASE}/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        log(`Order created: ${JSON.stringify(result)}`);
+        resetForm();
+        fetchAllOrders();
+      } catch (error) {
+        log(`Create order failed: ${error.message}`);
+      }
+    }
+
+    async function searchOrders() {
+      try {
+        const customer_id = document.getElementById('search_customer').value;
+        const status = document.getElementById('search_status').value;
+        const payload = {};
+        if (customer_id) payload.customer_id = Number(customer_id);
+        if (status) payload.status = status;
+        const res = await fetch(`${API_BASE}/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const orders = await res.json();
+        log(`Search returned ${orders.length} orders`);
+        populateTable(orders);
+      } catch (error) {
+        log(`Search orders failed: ${error.message}`);
+      }
+    }
+
+    async function updateOrder(id, data) {
+      try {
+        const res = await fetch(`${API_BASE}/orders/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        log(`Order updated: ${JSON.stringify(result)}`);
+        resetForm();
+        fetchAllOrders();
+      } catch (error) {
+        log(`Update order failed: ${error.message}`);
+      }
+    }
+
+    async function deleteOrder(id) {
+      if (!confirm('Delete this order?')) return;
+      try {
+        await fetch(`${API_BASE}/orders/${id}`, { method: 'DELETE' });
+        log(`Order ${id} deleted`);
+        fetchAllOrders();
+      } catch (error) {
+        log(`Delete order failed: ${error.message}`);
+      }
+    }
+
+    function populateTable(orders) {
+      const tbody = document.getElementById('orders-body');
+      tbody.innerHTML = '';
+      orders.forEach(o => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${o._id}</td>
+          <td>${o.order_id}</td>
+          <td>${o.customer_id}</td>
+          <td>${new Date(o.order_date).toLocaleDateString()}</td>
+          <td>${o.amount}</td>
+          <td>${o.status}</td>
+          <td>
+            <button onclick="editOrder('${o._id}')">Edit</button>
+            <button onclick="deleteOrder('${o._id}')">Delete</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function editOrder(id) {
+      fetch(`${API_BASE}/orders`)
+        .then(res => res.json())
+        .then(orders => {
+          const o = orders.find(x => x._id === id);
+          if (!o) return;
+          log(`Editing order ${id}`);
+          document.getElementById('form-title').textContent = 'Update Order';
+          document.getElementById('order-id').value = o._id;
+          document.getElementById('order_id').value = o.order_id;
+          document.getElementById('customer_id').value = o.customer_id;
+          document.getElementById('order_date').value = o.order_date.split('T')[0];
+          document.getElementById('amount').value = o.amount;
+          document.getElementById('status').value = o.status;
+          document.getElementById('submit-btn').textContent = 'Update';
+          document.getElementById('cancel-btn').classList.remove('hidden');
+        })
+        .catch(error => log(`Edit fetch failed: ${error.message}`));
+    }
+
+    function resetForm() {
+      document.getElementById('form-title').textContent = 'Create New Order';
+      document.getElementById('order-id').value = '';
+      document.getElementById('order-form').reset();
+      document.getElementById('submit-btn').textContent = 'Save Order';
+      document.getElementById('cancel-btn').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
